@@ -765,6 +765,11 @@ AS WELL.  Otherwise your primary login credentials may get wacked."
   (message "Help: %s" (append twit-key-list '(("g" . "Reload Current Page")))))
 
 ;; *var
+(defvar twit-start-page 0)
+(make-variable-buffer-local 'twit-start-page)
+(defvar twit-end-page 0)
+(make-variable-buffer-local 'twit-end-page)
+
 (defvar twit-timer
   nil
   "Timer object that handles polling the followers.")
@@ -779,6 +784,7 @@ AS WELL.  Otherwise your primary login credentials may get wacked."
   "Window object to get window-width.")
 
 ;;* const url
+(defvar twit-current-page nil)
 (defconst twit-base-search-url "http://search.twitter.com")
 (defconst twit-base-url (concat twit-protocol "://api.twitter.com/1"))
 (defconst twit-secure-base-url (concat twit-protocol "://api.twitter.com"))
@@ -930,6 +936,21 @@ The value returned is the current buffer."
      (use-local-map twit-status-mode-map)
      (goto-char (point-min))
      (current-buffer)))
+
+(defmacro update-twit-buffer (buffer-name &rest forms)
+  "Update an existing twitter buffer named BUFFER-NAME by FORMS.
+
+The value returned is the current buffer."
+  `(with-current-buffer (get-buffer-create ,buffer-name)
+     (toggle-read-only 0)
+     (goto-char (point-max))
+     ,@forms
+     (set-buffer-modified-p nil)
+     (toggle-read-only 1)
+     (use-local-map twit-status-mode-map)
+     (goto-char (point-min))
+     (current-buffer)))
+
 
 ;;* macro auth
 (defmacro with-twit-auth (user pass &rest forms)
@@ -1470,15 +1491,16 @@ TIMES-THROUGH is an integer representing the number of times a tweet has been
                                                      (concat " (" user-name ")")
                                                      ""))
                                          `((face . "twit-author-face")))
-    (insert "\n\t")
+    (insert "\n")
     (let* ((message
             (with-temp-buffer
               (let ((fill-column (- (window-width twit-window) 2)))
-                (insert "\t")
+				(when twit-fill-tweets
+				  (insert "\t"))
                 (insert message)
                 (when twit-fill-tweets
                   (fill-region (point-min) (point-max)))
-                (buffer-substring 2 (point-max))))))
+                (buffer-substring 1 (point-max))))))
       (twit-insert-with-overlay-attributes (twit-keymap-and-fontify-message message)
                                            '((face . "twit-message-face"))
                                            " "))
@@ -2008,6 +2030,7 @@ long."
 With a numeric prefix argument, it will skip to that PAGE like `twit-show-recent-tweets'."
   (interactive "P")
   (setq page (twit-check-page-prefix page))
+  (setq twit-current-page page)
   (pop-to-buffer
    (with-twit-buffer (concat "*Twit-favorites-" twit-user "*")
      (twit-write-title "Favorites of  %s (Page %s) %s\n"
@@ -2154,15 +2177,28 @@ With a numeric prefix arg PAGE, it will skip to that page of tweets.
 Patch version from Ben Atkin."
   (interactive "P")
   (setq page (twit-check-page-prefix page))
+  (setq twit-start-page page)
   (pop-to-buffer
    (with-twit-buffer "*Twit-recent*"
      (twit-write-title "Recent Tweets (Page %s) [%s]\n"
                        page (format-time-string "%c"))
      (twit-write-recent-tweets
-      (twit-parse-xml (format twit-home-timeline-file page) "GET")))))
+      (twit-parse-xml (format twit-home-timeline-file page) "GET"))
+	 (setq twit-start-page page
+		   twit-end-page (1+ page)))))
 
 
 ;;* interactive nav
+(defun twit-insert-next-page ()
+  (interactive)
+  ; TODO: see what's in this page: friend, user, at, search
+  (update-twit-buffer "*Twit-recent*"
+   (twit-write-recent-tweets
+	(twit-parse-xml (format twit-home-timeline-file twit-end-page) "GET")))
+  (incf twit-end-page))
+
+
+;;* analyse interactive
 (defun twit-next-tweet (&optional arg)
   "Move forward to the next tweet.
 
@@ -2313,7 +2349,6 @@ the URL itself."
             (twit-visit-link))
         (message "No URL found in this tweet!")))))
 
-;;* analyse interactive
 (defun twit-analyse-user ()
   "Analyse the user under the point with Twanalyst."
   (interactive)
