@@ -503,6 +503,11 @@ all elisp packages."
    :type 'boolean
    :group 'twit)
 
+(defcustom twit-show-multiline nil
+  "Display one status as multiple line"
+  :type 'boolean
+  :group 'twit)
+
 (defcustom twit-user-image-dir
   (concat (car image-load-path) "twitter")
   "Directory where twitter user images are to be stored.
@@ -1475,6 +1480,8 @@ TIMES-THROUGH is an integer representing the number of times a tweet has been
 
     (setq overlay-start (point))
 
+	(insert "*")
+
     (when (and twit-show-user-images user-img)
           (insert " ")
           (insert-image user-img)
@@ -1487,25 +1494,25 @@ TIMES-THROUGH is an integer representing the number of times a tweet has been
         (insert " "))
 
     (twit-insert-with-overlay-attributes (concat user-id
-                                                 (if user-name
+                                                 (if (and user-name twit-show-multiline)
                                                      (concat " (" user-name ")")
                                                      ""))
                                          `((face . "twit-author-face")))
-    (insert "\n")
+	(when twit-show-multiline (insert "\n\t"))
     (let* ((message
             (with-temp-buffer
               (let ((fill-column (- (window-width twit-window) 2)))
 				(when twit-fill-tweets
 				  (insert "\t"))
                 (insert message)
-                (when twit-fill-tweets
+                (when (and twit-show-multiline twit-fill-tweets)
                   (fill-region (point-min) (point-max)))
                 (buffer-substring 1 (point-max))))))
       (twit-insert-with-overlay-attributes (twit-keymap-and-fontify-message message)
                                            '((face . "twit-message-face"))
                                            " "))
 
-    (insert "\n")
+    (when twit-show-multiline (insert "\n"))
     (when (or timestamp location src-info)
           (twit-insert-with-overlay-attributes
            (concat "                          "
