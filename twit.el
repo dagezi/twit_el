@@ -1364,6 +1364,80 @@ It is in the format of (timestamp user-id message)")
     "Return the value of the first child of some sxml. "
     (car (xml-node-children (xml-first-child node addr)))))
 
+;; misc parse functions
+(defun twit-xml-parse-bool (string)
+  (equal string "true"))
+(defun twit-xml-parse-date (string)
+  (date-to-time string))
+(defun twit-xml-parse-string (string)
+  (xml-substitute-special string))
+(defun twit-xml-parse-html (string)
+  ;; what to do?
+  string)
+
+;;; maintain database
+(defstruct twit-status 
+  date id text source reply-to reply-to-id favorited user 
+  retweet location)
+
+(defvar twit-statuses '()) ; buffer local
+(defvar twit-status-hash nil) ; is this global?
+(defvar twit-user-hash nil) ; is this global?
+
+(defun twit-push-symbol-ordered-list (symbol list)
+  "Destructive"
+  (let* ((placeholder (cons nil list))
+		 (prev placeholder)
+		 (syms (symbol-name symbol)))
+	(while (and list
+				(string< syms (symbol-name (car list))))
+		(setq prev list
+			  list (cdr list)))
+	(when (not (eq (car list) symbol))
+	  (setcdr prev (cons symbol list)))
+	(cdr placeholder)))
+(when nil
+  (and
+   (equal (twit-push-symbol-ordered-list 'a nil) '(a))
+   (equal (twit-push-symbol-ordered-list 'a '(a)) '(a))
+   (equal (twit-push-symbol-ordered-list 'b '(a)) '(b a))
+   (equal (twit-push-symbol-ordered-list 'a '(b)) '(b a))
+   (equal (twit-push-symbol-ordered-list 'a '(b a)) '(b a))
+   (equal (twit-push-symbol-ordered-list 'b '(c a)) '(c b a))))
+
+(defun twit-update-statuses (xml-data)
+  (dolist (tweet (xml-get-children xml-data 'status))
+	(let* ((tweet-id (intern (xml-first-childs-value tweet 'id)))
+		   (retweet (xml-first-child tweet 'retweeted_status))
+		   (user-info (or (xml-first-child tweet 'user) 
+						  (xml-first-child tweet 'sender)))
+		   (location (xml-first-childs-value user-info 'location))
+		   (date (twit-xml-parse-date 
+				  (xml-first-childs-value tweet 'created_at)))
+		   (text (twit-xml-parse-string (xml-first-childs-value tweet 'text)))
+		   (source (xml-first-childs-value tweet 'source))
+		   (favorited (xml-first-childs-value tweet 'favorited))
+		   (reply-to-id
+			(xml-first-childs-value tweet 'in_reply_to_status_id)))
+	  (when (not (gethash tweet-id twit-status-hash))
+		(let ((status (make-twit-status 
+					   :id tweet-id
+					   :retweet retweet
+					   :user user-info
+					   :location location
+					   :date date
+					   :text text
+					   :source source
+					   :favorited favorited
+					   :reply-to-id reply-to-id)))
+		  (puthash tweet-id status twit-status-hash)))
+	  (twit-push-symbol-ordered-list tweet-id twit-statuses))))
+;; Shall i register retweeted status?
+;; intern id to speedup?
+	
+;;; how to update buffer via status-hash?
+
+;;*var filter
 ;;; xml parsing is a little hacky and needs work.
 ;;* tweets write last-tweet
 (defun twit-write-recent-tweets (xml-data)
@@ -1397,7 +1471,6 @@ XML-DATA is the sxml (with http header)."
   ;; this needs more TLC
   (if twit-debug-mem (message (garbage-collect))))
 
-;;*var filter
 (defvar twit-last-author '(nil .0)
   "Author information about the last tweet.
 
