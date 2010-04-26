@@ -774,6 +774,11 @@ AS WELL.  Otherwise your primary login credentials may get wacked."
 (make-variable-buffer-local 'twit-start-page)
 (defvar twit-end-page 0)
 (make-variable-buffer-local 'twit-end-page)
+(defvar twit-last-status-id nil)
+(make-variable-buffer-local 'twit-last-status-id)
+(defvar twit-first-status-id nil)
+(make-variable-buffer-local 'twit-first-status-id)
+
 
 (defvar twit-timer
   nil
@@ -953,7 +958,6 @@ The value returned is the current buffer."
      (set-buffer-modified-p nil)
      (toggle-read-only 1)
      (use-local-map twit-status-mode-map)
-     (goto-char (point-min))
      (current-buffer)))
 
 
@@ -1426,6 +1430,30 @@ This is used by `twit-filter-diarrhea'.")
                      (cdr twit-last-author))))))
 
 ;;* tweet direct write image
+(defun twit-insert-old-tweets (xml-data)
+  (goto-char (point-max))
+  (let ((times-through 0))
+	(dolist (status-node (xml-get-children (cadr xml-data) 'status))
+	  ;; TODO filter
+	  (let ((id (xml-first-childs-value status-node 'id)))
+		(when (or (null twit-first-status-id) 
+				  (string< id twit-first-status-id))
+		  (twit-write-tweet status-node nil times-through)
+		  (setq times-through (1+ times-through)))))
+	times-through))
+
+(defun twit-insert-latest-tweets (xml-data)
+  (goto-char (point-min))
+  (next-line)
+  (let ((times-through 0))
+	(dolist (status-node (xml-get-children (cadr xml-data) 'status))
+	  ;; TODO filter
+	  (let ((id (xml-first-childs-value status-node 'id)))
+		(when (string< twit-last-status-id id)
+		  (twit-write-tweet status-node nil times-through)
+		  (setq times-through (1+ times-through)))))
+	times-through))
+  
 (defun twit-write-tweet (tweet &optional filter-tweets times-through)
   "Insert a tweet into the current buffer.
 TWEET should be an xml parsed node, which could be a message or a status node.
@@ -1538,7 +1566,13 @@ TIMES-THROUGH is an integer representing the number of times a tweet has been
                              "twit-zebra-1-face"
                              "twit-zebra-2-face"))
       (overlay-put o 'twit-id tweet-id)
-      (overlay-put o 'twit-user user-id))))
+      (overlay-put o 'twit-user user-id))
+	(when (or (null twit-last-status-id)
+			  (string< twit-last-status-id tweet-id))
+	  (setq twit-last-status-id tweet-id))
+	(when (or (null twit-first-status-id)
+			  (string< tweet-id twit-first-status-id))
+	  (setq twit-first-status-id tweet-id))))
 
 ;;* write helper
 (defun twit-write-title (title &rest args)
@@ -1547,8 +1581,8 @@ TIMES-THROUGH is an integer representing the number of times a tweet has been
 TITLE is the title to display, and it is formatted with ARGS."
   (twit-insert-with-overlay-attributes
    (concat (propertize "(^)o<" 'face 'twit-logo-face)
-           " "
-           (apply 'format title args))
+		   " "
+		   (apply 'format title args))
    '((face . "twit-title-face"))))
 
 ;;* write helper
@@ -2199,11 +2233,11 @@ Patch version from Ben Atkin."
 (defun twit-insert-next-page ()
   (interactive)
   ; TODO: see what's in this page: friend, user, at, search
-  (update-twit-buffer "*Twit-recent*"
-   (twit-write-recent-tweets
-	(twit-parse-xml (format twit-home-timeline-file twit-end-page) "GET")))
+  (save-excursion
+	(update-twit-buffer "*Twit-recent*"
+	 (twit-insert-old-tweets
+	  (twit-parse-xml (format twit-home-timeline-file twit-end-page) "GET"))))
   (incf twit-end-page))
-
 
 ;;* analyse interactive
 (defun twit-next-tweet (&optional arg)
