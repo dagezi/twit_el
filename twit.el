@@ -602,7 +602,7 @@ AS WELL.  Otherwise your primary login credentials may get wacked."
 
 (defface twit-author-face
     '((t
-       (:height 0.8
+       (:height 1.0
         :weight bold
         :family "mono")))
   "The font face to use for the authors name"
@@ -1448,8 +1448,9 @@ This is used by `twit-filter-diarrhea'.")
   (let ((times-through 0))
 	(dolist (status-node (xml-get-children (cadr xml-data) 'status))
 	  ;; TODO filter
-	  (let ((id (xml-first-childs-value status-node 'id)))
-		(when (string< twit-last-status-id id)
+	  (let ((id (xml-first-childs-value status-node 'id))
+			(last-id twit-last-status-id))
+		(when (string< last-id id)
 		  (twit-write-tweet status-node nil times-through)
 		  (setq times-through (1+ times-through)))))
 	times-through))
@@ -2237,7 +2238,17 @@ Patch version from Ben Atkin."
 	(update-twit-buffer "*Twit-recent*"
 	 (twit-insert-old-tweets
 	  (twit-parse-xml (format twit-home-timeline-file twit-end-page) "GET"))))
+  ; TODO: repeat until some new tweets were inserted... but should be async?
   (incf twit-end-page))
+
+(defun twit-insert-lastest-status ()
+  (interactive)
+  (save-excursion
+	(update-twit-buffer "*Twit-recent*"
+	 (twit-insert-latest-tweets
+      (twit-parse-xml (format twit-home-timeline-file 0) "GET"))))
+  ; TODO: show cap between the previous latest tweet and tweet we get
+)
 
 ;;* analyse interactive
 (defun twit-next-tweet (&optional arg)
