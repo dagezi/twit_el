@@ -944,6 +944,8 @@ The value returned is the current buffer."
      (set-buffer-modified-p nil)
      (toggle-read-only 1)
      (use-local-map twit-status-mode-map)
+	 (setq twit-last-status-id nil
+		   twit-first-status-id nil)
      (goto-char (point-min))
      (current-buffer)))
 
@@ -1445,11 +1447,11 @@ This is used by `twit-filter-diarrhea'.")
 (defun twit-insert-latest-tweets (xml-data)
   (goto-char (point-min))
   (next-line)
-  (let ((times-through 0))
+  (let ((times-through 0) ;; TODO caliculate times-thru .. or obsolete?
+		(last-id twit-last-status-id))
 	(dolist (status-node (xml-get-children (cadr xml-data) 'status))
 	  ;; TODO filter
-	  (let ((id (xml-first-childs-value status-node 'id))
-			(last-id twit-last-status-id))
+	  (let ((id (xml-first-childs-value status-node 'id)))
 		(when (string< last-id id)
 		  (twit-write-tweet status-node nil times-through)
 		  (setq times-through (1+ times-through)))))
@@ -2231,7 +2233,7 @@ Patch version from Ben Atkin."
 
 
 ;;* interactive nav
-(defun twit-insert-next-page ()
+(defun twit-show-next-page ()
   (interactive)
   ; TODO: see what's in this page: friend, user, at, search
   (save-excursion
@@ -2241,7 +2243,7 @@ Patch version from Ben Atkin."
   ; TODO: repeat until some new tweets were inserted... but should be async?
   (incf twit-end-page))
 
-(defun twit-insert-lastest-status ()
+(defun twit-update-lastest-status ()
   (interactive)
   (save-excursion
 	(update-twit-buffer "*Twit-recent*"
