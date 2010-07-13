@@ -720,7 +720,7 @@ AS WELL.  Otherwise your primary login credentials may get wacked."
 
 ;;* var keymap
 (defvar twit-key-list
-  '(("s" . twit-show-recent-tweets)
+  '(("s" . twit-update-lastest-status)
     ("f" . twit-show-followers)
     ("@" . twit-show-at-tweets)
 
@@ -810,6 +810,8 @@ AS WELL.  Otherwise your primary login credentials may get wacked."
   (concat twit-base-url "/statuses/friends_timeline.xml?page=%s"))
 (defconst twit-home-timeline-file
   (concat twit-base-url "/statuses/home_timeline.xml?page=%s"))
+(defconst twit-user-timeline-file
+  (concat twit-base-url "/statuses/user_timeline.xml?page=%s"))
 (defconst twit-followers-list-url
   (concat twit-base-url "/statuses/followers.xml?page=%s"))
 (defconst twit-friend-list-url
@@ -1860,7 +1862,7 @@ This is the reverse of `get-char-property', it checks text properties first."
                     nil
                     t))
 
-;;* read friends
+;;* read friends from Minibuffer
 (defun twit-read-friend (prompt &optional req)
   "Does a completing read to find a friend.
 
@@ -2221,9 +2223,9 @@ With a numeric prefix arg PAGE, it will skip to that page of tweets.
 Patch version from Ben Atkin."
   (interactive "P")
   (setq page (twit-check-page-prefix page))
-  (setq twit-start-page page)
   (pop-to-buffer
    (with-twit-buffer "*Twit-recent*"
+	 (setq twit-start-page page)
      (twit-write-title "Recent Tweets (Page %s) [%s]\n"
                        page (format-time-string "%c"))
      (twit-write-recent-tweets
@@ -2251,6 +2253,23 @@ Patch version from Ben Atkin."
       (twit-parse-xml (format twit-home-timeline-file 0) "GET"))))
   ; TODO: show cap between the previous latest tweet and tweet we get
 )
+
+(defun twit-show-users-tweet (user page)
+  (interactive 
+   (list (read-string "User " (twit-get-text-property 'twit-user))
+		 current-prefix-arg))
+  (setq page (twit-check-page-prefix page))
+  (pop-to-buffer
+   (with-twit-buffer (format "*Twit-user(%s)*" user)
+     (setq twit-start-page page)
+     (twit-write-title "Recent Tweets by %s (Page %s) [%s]\n"
+                       user page (format-time-string "%c"))
+     (twit-write-recent-tweets
+      (twit-parse-xml (concat (format twit-user-timeline-file page)
+							  (format "&id=%s" user))
+					  "GET"))
+	 (setq twit-start-page page
+		   twit-end-page (1+ page)))))
 
 ;;* analyse interactive
 (defun twit-next-tweet (&optional arg)
