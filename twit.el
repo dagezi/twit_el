@@ -778,6 +778,8 @@ AS WELL.  Otherwise your primary login credentials may get wacked."
 (make-variable-buffer-local 'twit-last-status-id)
 (defvar twit-first-status-id nil)
 (make-variable-buffer-local 'twit-first-status-id)
+(defvar twit-refetch-url nil)
+(make-variable-buffer-local 'twit-refetch-url)
 
 
 (defvar twit-timer
@@ -942,27 +944,26 @@ The value returned is the current buffer."
      (buffer-disable-undo)
      (toggle-read-only 0)
      (delete-region (point-min) (point-max))
+	 (setq twit-last-status-id nil
+		   twit-first-status-id nil)
      ,@forms
      (set-buffer-modified-p nil)
      (toggle-read-only 1)
      (use-local-map twit-status-mode-map)
-	 (setq twit-last-status-id nil
-		   twit-first-status-id nil)
      (goto-char (point-min))
      (current-buffer)))
 
-(defmacro update-twit-buffer (buffer-name &rest forms)
+(defmacro update-twit-buffer (&rest forms)
   "Update an existing twitter buffer named BUFFER-NAME by FORMS.
 
 The value returned is the current buffer."
-  `(with-current-buffer (get-buffer-create ,buffer-name)
+  `(progn
      (toggle-read-only 0)
      (goto-char (point-max))
      ,@forms
      (set-buffer-modified-p nil)
      (toggle-read-only 1)
-     (use-local-map twit-status-mode-map)
-     (current-buffer)))
+     (use-local-map twit-status-mode-map)))
 
 
 ;;* macro auth
@@ -2226,6 +2227,7 @@ Patch version from Ben Atkin."
   (pop-to-buffer
    (with-twit-buffer "*Twit-recent*"
 	 (setq twit-start-page page)
+	 (setq twit-refetch-url twit-home-timeline-file)
      (twit-write-title "Recent Tweets (Page %s) [%s]\n"
                        page (format-time-string "%c"))
      (twit-write-recent-tweets
@@ -2239,19 +2241,21 @@ Patch version from Ben Atkin."
   (interactive)
   ; TODO: see what's in this page: friend, user, at, search
   (save-excursion
-	(update-twit-buffer "*Twit-recent*"
+	(update-twit-buffer 
 	 (twit-insert-old-tweets
-	  (twit-parse-xml (format twit-home-timeline-file twit-end-page) "GET"))))
+	  (twit-parse-xml (format twit-refetch-url twit-end-page) "GET"))))
   ; TODO: repeat until some new tweets were inserted... but should be async?
+  ; TODO: use 'max_id'
   (incf twit-end-page))
 
 (defun twit-update-lastest-status ()
   (interactive)
   (save-excursion
-	(update-twit-buffer "*Twit-recent*"
+	(update-twit-buffer
 	 (twit-insert-latest-tweets
-      (twit-parse-xml (format twit-home-timeline-file 0) "GET"))))
-  ; TODO: show cap between the previous latest tweet and tweet we get
+	  (twit-parse-xml (format twit-refetch-url 0) "GET"))))
+  ; TODO: use 'since_id'
+  ; TODO: show gap between the previous latest tweet and tweet we get
 )
 
 (defun twit-show-users-tweet (user page)
@@ -2262,12 +2266,12 @@ Patch version from Ben Atkin."
   (pop-to-buffer
    (with-twit-buffer (format "*Twit-user(%s)*" user)
      (setq twit-start-page page)
+	 (setq twit-refetch-url (concat twit-user-timeline-file 
+									(format "&id=%s" user)))
      (twit-write-title "Recent Tweets by %s (Page %s) [%s]\n"
                        user page (format-time-string "%c"))
      (twit-write-recent-tweets
-      (twit-parse-xml (concat (format twit-user-timeline-file page)
-							  (format "&id=%s" user))
-					  "GET"))
+      (twit-parse-xml (format twit-refetch-url page) "GET"))
 	 (setq twit-start-page page
 		   twit-end-page (1+ page)))))
 
