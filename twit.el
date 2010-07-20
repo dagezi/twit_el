@@ -2270,7 +2270,6 @@ Patch version from Ben Atkin."
   (setq page (twit-check-page-prefix page))
   (pop-to-buffer
    (with-twit-buffer "*Twit-recent*"
-	 (setq twit-start-page page)
 	 (setq twit-refetch-url twit-home-timeline-file)
      (twit-write-title "Recent Tweets (Page %s) [%s]\n"
                        page (format-time-string "%c"))
@@ -2288,7 +2287,6 @@ Patch version from Ben Atkin."
   (setq page (twit-check-page-prefix page))
   (pop-to-buffer
    (with-twit-buffer (format "*Twit-user(%s)*" user)
-     (setq twit-start-page page)
 	 (setq twit-refetch-url (concat twit-user-timeline-file 
 									(format "&id=%s" user)))
      (twit-write-title "Recent Tweets by %s (Page %s) [%s]\n"
@@ -2297,8 +2295,6 @@ Patch version from Ben Atkin."
       (twit-parse-xml (format twit-refetch-url page) "GET"))
 	 (setq twit-start-page page
 		   twit-end-page (1+ page)))))
-
-;;* analyse interactive
 
 ;;* search helper var
 
@@ -2363,16 +2359,14 @@ With a numeric prefix argument, it will skip to that PAGE like `twit-show-recent
   (setq page (twit-check-page-prefix page))
   (pop-to-buffer
    (with-twit-buffer (concat "*Twit-at-" twit-user "*")
+	 (setq twit-refetch-url twit-mentions-url)
      (twit-write-title "Twit @%s (Page %s) %s\n"
                        twit-user page (format-time-string "%c"))
-     (let ((times-through 0))
-       (dolist
-           (status-node (xml-get-children
-                         (cadr (twit-parse-xml
-                                (format twit-mentions-url page) "GET"))
-                         'status))
-         (twit-write-tweet status-node t times-through)
-         (setq times-through (+ 1 times-through)))))))
+
+	 (twit-write-recent-tweets
+	  (twit-parse-xml (format twit-refetch-url page) "GET"))
+	 (setq twit-start-page page
+		   twit-end-page (1+ page)))))
 
 ;;* at-you show interactive multi-account
 (defun twit-show-at-tweets-with-account (account page)
@@ -2429,6 +2423,8 @@ the URL itself."
             (forward-char -1)
             (twit-visit-link))
         (message "No URL found in this tweet!")))))
+
+;;* analyse interactive
 
 (defun twit-analyse-user ()
   "Analyse the user under the point with Twanalyst."
