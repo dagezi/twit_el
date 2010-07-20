@@ -2206,7 +2206,51 @@ You can change the time between each check by customizing
   (cancel-timer twit-timer)
   (cancel-timer twit-rate-limit-timer))
 
+;;; kind of generic function for status buffers
+(defun twit-show-next-page ()
+  (interactive)
+  ; TODO: see what's in this page: friend, user, at, search
+  (save-excursion
+	(update-twit-buffer 
+	 (twit-insert-old-tweets
+	  (twit-parse-xml (format twit-refetch-url twit-end-page) "GET"))))
+  ; TODO: repeat until some new tweets were inserted... but should be async?
+  ; TODO: use 'max_id'
+  (incf twit-end-page))
+
+(defun twit-update-lastest-status ()
+  (interactive)
+  (save-excursion
+	(update-twit-buffer
+	 (twit-insert-latest-tweets
+	  (twit-parse-xml (format twit-refetch-url 0) "GET"))))
+  ; TODO: use 'since_id'
+  ; TODO: show gap between the previous latest tweet and tweet we get
+)
+
+(defun twit-next-tweet (&optional arg)
+  "Move forward to the next tweet.
+
+With argument ARG, move to the ARGth next tweet."
+  (interactive "p")
+  (mapc (lambda (n)
+          (goto-char (next-single-char-property-change (point) 'twit-id nil
+                                                       (point-max))))
+        (number-sequence 1 (or arg 1))))
+
+;;* interactive nav
+(defun twit-previous-tweet (&optional arg)
+  "Move backward to the previous tweet.
+
+With argument ARG, move to the ARGth previous tweet."
+  (interactive "p")
+  (mapc (lambda (n)
+          (goto-char (previous-single-char-property-change (point) 'twit-id nil
+                                                           (point-min))))
+        (number-sequence 1 (or arg 1))))
+
 ;;* tweet show  interactive
+
 ;;;###autoload
 (defun twit-show-recent-tweets (&optional page)
   "Display a list of the most recent tweets from people you're following.
@@ -2237,27 +2281,6 @@ Patch version from Ben Atkin."
 
 
 ;;* interactive nav
-(defun twit-show-next-page ()
-  (interactive)
-  ; TODO: see what's in this page: friend, user, at, search
-  (save-excursion
-	(update-twit-buffer 
-	 (twit-insert-old-tweets
-	  (twit-parse-xml (format twit-refetch-url twit-end-page) "GET"))))
-  ; TODO: repeat until some new tweets were inserted... but should be async?
-  ; TODO: use 'max_id'
-  (incf twit-end-page))
-
-(defun twit-update-lastest-status ()
-  (interactive)
-  (save-excursion
-	(update-twit-buffer
-	 (twit-insert-latest-tweets
-	  (twit-parse-xml (format twit-refetch-url 0) "GET"))))
-  ; TODO: use 'since_id'
-  ; TODO: show gap between the previous latest tweet and tweet we get
-)
-
 (defun twit-show-users-tweet (user page)
   (interactive 
    (list (read-string "User " (twit-get-text-property 'twit-user))
@@ -2276,28 +2299,9 @@ Patch version from Ben Atkin."
 		   twit-end-page (1+ page)))))
 
 ;;* analyse interactive
-(defun twit-next-tweet (&optional arg)
-  "Move forward to the next tweet.
-
-With argument ARG, move to the ARGth next tweet."
-  (interactive "p")
-  (mapc (lambda (n)
-          (goto-char (next-single-char-property-change (point) 'twit-id nil
-                                                       (point-max))))
-        (number-sequence 1 (or arg 1))))
-
-;;* interactive nav
-(defun twit-previous-tweet (&optional arg)
-  "Move backward to the previous tweet.
-
-With argument ARG, move to the ARGth previous tweet."
-  (interactive "p")
-  (mapc (lambda (n)
-          (goto-char (previous-single-char-property-change (point) 'twit-id nil
-                                                           (point-min))))
-        (number-sequence 1 (or arg 1))))
 
 ;;* search helper var
+
 (defvar twit-this-sessions-searches 'nil
   "A variable to store any searches that the user has already searched for this session.")
 
