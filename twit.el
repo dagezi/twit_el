@@ -805,7 +805,7 @@ AS WELL.  Otherwise your primary login credentials may get wacked."
   (concat twit-base-url "/statuses/update.xml"))
 (defconst twit-retweet-file
   (concat twit-base-url "/statuses/retweet/%s.xml"))
-(defconst twit-puplic-timeline-file
+(defconst twit-public-timeline-file
   (concat twit-base-url "/statuses/public_timeline.xml?page=%s"))
 ;;friends-timeline is deprecated use home-timeline instead
 (defconst twit-friend-timeline-file
